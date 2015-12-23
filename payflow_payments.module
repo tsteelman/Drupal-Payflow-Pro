@@ -1,0 +1,148 @@
+<?php
+/**
+ * @file
+ * A block module that displays recent blog and forum posts.
+ */
+
+function payflow_payments_help($path, $arg) {
+	switch ($path) {
+		case "admin/help#payflow_payments":
+			return '<p>' . t("Displays links to nodes created on this date") . '</p>';
+			break;
+	}
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function payflow_payments_block_info() {
+	$blocks['payflow_payments'] = array(
+			// The name that will appear in the block list.
+			'info' => t('Payflow Payments'),
+			// Default setting.
+			'cache' => DRUPAL_CACHE_PER_ROLE,
+	);
+	return $blocks;
+}
+
+/**
+ * Custom content function.
+ *
+ * Set beginning and end dates, retrieve posts from database
+ * saved in that time period.
+ *
+ * @return
+ *   A result set of the targeted posts.
+ */
+function payflow_payments_contents(){
+	//Get today's date.
+	$today = getdate();
+	//Calculate the date a week ago.
+	$start_time = mktime(0, 0, 0,$today['mon'],($today['mday'] - 7), $today['year']);
+	//Get all posts from one week ago to the present.
+	$end_time = time();
+
+	//Use Database API to retrieve current posts.
+	$query = db_select('node', 'n')
+	->fields('n', array('nid', 'title', 'created'))
+	->condition('status', 1) //Published.
+	->condition('created', array($start_time, $end_time), 'BETWEEN')
+	->orderBy('created', 'DESC') //Most recent first.
+	->execute();
+	return $query;
+}
+
+/**
+ * Implements hook_block_view().
+ *
+ * Prepares the contents of the block.
+ */
+function payflow_payments_block_view($delta = '') {
+	switch ($delta) {
+		case 'payflow_payments':
+			$block['subject'] = t('Payflow Payment');
+			if (user_access('access content')) {
+				// Use our custom function to retrieve data.
+				$result = payflow_payments_contents();
+				// Array to contain items for the block to render.
+				$items = array();
+				// Iterate over the resultset and format as links.
+				foreach ($result as $node) {
+					$items[] = array(
+							'data' => l($node->title, 'node/' . $node->nid),
+					);
+				}
+				// No content in the last week.
+				if (empty($items)) {
+					$block['content'] = t('No posts available.');
+				}
+				else {
+					// Pass data through theme function.
+					$block['content'] = theme('item_list', array(
+							'items' => $items));
+				}
+			}
+			return $block;
+	}
+
+}
+
+/**
+ * Implements hook_menu().
+ */
+function payflow_payments_menu() {
+	$items = array();
+
+	$items['admin/config/content/payflow_payments'] = array(
+			'title' => 'Payflow Payments',
+			'description' => 'Configuration for Payflow Payments module',
+			'page callback' => 'drupal_get_form',
+			'page arguments' => array('payflow_payments_form'),
+			'access arguments' => array('access administration pages'),
+			'type' => MENU_NORMAL_ITEM,
+	);
+
+	return $items;
+}
+/**
+ * Implements Payflow form
+ * @param $form
+ * @param $form_state
+ * @return $form
+ */
+function payflow_payments_form($form, &$form_state) {
+	
+	$form['payflow_payments_type'] = array(
+			'#type' => 'select',
+			'#title' => t('Live/Test'),
+			'#options' => array(
+					0 => t('live'),
+					1 => t('test'),
+			),
+			'#default_value' => variable_get('payflow_payments_type', 'test'),
+			'#description' => t('Set this to <em>live</em> for live transactions'),
+	);
+	
+	$form['payflow_payments_username'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Payflow Pro User name'),
+			'#default_value' => variable_get('payflow_payments_username', 'user'),
+			'#size' => 30,
+			'#maxlength' => 30,
+			'#description' => t('Username for Payflow Pro.'),
+			'#required' => TRUE,
+	);
+	
+	$form['payflow_payments_password'] = array(
+			'#type' => 'password',
+			'#title' => t('Payflow Pro User password'),
+			'#default_value' => variable_get('payflow_payments_password', 'password'),
+			'#size' => 30,
+			'#maxlength' => 30,
+			'#description' => t('User password for Payflow Pro.'),
+			'#required' => TRUE,
+	);
+
+	return system_settings_form($form);
+}
+

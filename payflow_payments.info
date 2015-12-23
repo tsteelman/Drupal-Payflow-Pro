@@ -1,0 +1,5 @@
+name = Payflow Payments
+description = A block module that posts a payment to playflow pro.
+core = 7.x
+version = 1.0
+configure = admin/config/content/payflow_payments
