@@ -87,8 +87,8 @@ function payflow_payments_menu() {
 			'type' => MENU_NORMAL_ITEM,
 	);
 	
-	$items['examples/form-example'] = array( //this creates a URL that will call this form at "examples/form-example"
-			'title' => 'Example Form', //page title
+	$items['payflow-payments/payment'] = array( //this creates a URL that will call this form at "examples/form-example"
+			'title' => 'Payment Form', //page title
 			'description' => 'A form to mess around with.',
 			'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
 			'page arguments' => array('payflow_payments_form'), //put the name of the form here
@@ -177,6 +177,14 @@ function payflow_payments_form($form, &$form_state) {
 			'#required' => TRUE,
 	);
 	
+	$form['payflow_payments_invoice_num'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Invoice #'),
+			'#size' => 50,
+			'#maxlength' => 100,
+			'#required' => TRUE,
+	);
+	
 	$form['payflow_payments_cc_number'] = array(
 			'#type' => 'textfield',
 			'#title' => t('Credit Card #'),
@@ -188,30 +196,30 @@ function payflow_payments_form($form, &$form_state) {
 	$form['payflow_payments_amount'] = array(
 			'#type' => 'textfield',
 			'#title' => t('Amount'),
-			'#size' => 50,
-			'#maxlength' => 30,
+			'#size' => 10,
+			'#maxlength' => 6,
 			'#required' => TRUE,
 	);
 	
 	$months = array(
-     1 => "January",
-     2 => "February",
-     3 => "March",
-     4 => "April",
-     5 => "May",
-     6 => "June",
-     7 => "July",
-     8 => "August",
-     9 => "September",
-    10 => "October",
-    11 => "November",
-    12 => "December"
+     "01" => "January",
+     "02" => "February",
+     "03" => "March",
+     "04" => "April",
+     "05" => "May",
+     "06" => "June",
+     "07" => "July",
+     "08" => "August",
+     "09" => "September",
+    "10" => "October",
+    "11" => "November",
+    "12" => "December"
 	);
 	
 	$years = array();
 	$current_year = date("Y");
-	for($i=$current_year-5; $i<$current_year+5; $i++) {
-		$years[] = $i;
+	for($i=$current_year; $i<$current_year+5; $i++) {
+		$years[$i] = $i;
 	}
 	$form['payflow_payments_expiration_month'] = array(
 			'#type' => 'select',
@@ -227,19 +235,11 @@ function payflow_payments_form($form, &$form_state) {
 			'#required' => TRUE,
 	);
 	
-	$form['payflow_payments_comment1'] = array(
+	$form['payflow_payments_zip'] = array(
 			'#type' => 'textfield',
-			'#title' => t('Comment 1'),
-			'#size' => 50,
-			'#maxlength' => 100,
-			'#required' => TRUE,
-	);
-	
-	$form['payflow_payments_comment2'] = array(
-			'#type' => 'textfield',
-			'#title' => t('Comment 2'),
-			'#size' => 50,
-			'#maxlength' => 100,
+			'#title' => t('Billing Zip Code'),
+			'#size' => 10,
+			'#maxlength' => 10,
 			'#required' => TRUE,
 	);
 	
@@ -255,8 +255,6 @@ function payflow_payments_form_validate($form, &$form_state) {
 	$name = $form_state['values']['payflow_payments_name'];
 	$cc_number = $form_state['values']['payflow_payments_cc_number'];
 	$amount = $form_state['values']['payflow_payments_amount'];
-	$comment1 = $form_state['values']['payflow_payments_comment1'];
-	$comment2 = $form_state['values']['payflow_payments_comment2'];
 	
 	if(strlen($name)<5) {
 		form_set_error('payflow_payments_name', t('Card holders name must me greater than 5 characters'));
@@ -268,14 +266,6 @@ function payflow_payments_form_validate($form, &$form_state) {
 	
 	if(!is_numeric($amount)) {
 		form_set_error('payflow_payments_amount', t('Amount is not a valid number.'));
-	}
-	
-	if(strlen($comment1)<3) {
-		form_set_error('payflow_payments_name', t('Comment 1 must me greater than 3 characters'));
-	}
-	
-	if(strlen($comment2)<3) {
-		form_set_error('payflow_payments_name', t('Card holders name must me greater than 3 characters'));
 	}
 	
 }
@@ -292,12 +282,13 @@ function payflow_payments_form_submit($form, &$form_state) {
 	
 	//Get form values
 	$name = $form_state['values']['payflow_payments_name'];
+	$invoice_num = $form_state['values']['payflow_payments_invoice_num'];
 	$cc_number = $form_state['values']['payflow_payments_cc_number'];
 	$amount = $form_state['values']['payflow_payments_amount'];
 	$exp_month = $form_state['values']['payflow_payments_expiration_month'];
 	$exp_year = $form_state['values']['payflow_payments_expiration_year'];
-	$comment1 = $form_state['values']['payflow_payments_comment1'];
-	$comment2 = $form_state['values']['payflow_payments_comment2'];
+	$zip_code = $form_state['values']['payflow_payments_zip'];
+	
 	
 	//Validate the server settings are set 
 	if(strlen($type) ==0 ) {
@@ -355,9 +346,11 @@ function payflow_payments_form_submit($form, &$form_state) {
 			// The expiration date, in format 'mmyy'
 			'EXPDATE' => $exp_month.$exp_year,
 			// Comment 1
-			'COMMENT1' => $comment1,
+			'COMMENT1' => $name,
 			//Comment 2 
-			'COMMENT2' => $comment2
+			'COMMENT2' => $invoice_num,
+			//Zip Code
+			'ZIP' => $zip_code
 			// The order number
 			//'INVNUM' => $order->order_number,
 	);
