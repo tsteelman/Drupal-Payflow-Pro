@@ -5,10 +5,6 @@
  * Processes Payflow pro Payments.
  *
  */
-/**
- * @file
- * A block module that displays recent blog and forum posts.
- */
 
 define('PAYPAL_TXN_MODE_LIVE', 'live');
 define('PAYPAL_TXN_MODE_TEST', 'test');
@@ -255,6 +251,9 @@ function payflow_payments_form_validate($form, &$form_state) {
 	$name = $form_state['values']['payflow_payments_name'];
 	$cc_number = $form_state['values']['payflow_payments_cc_number'];
 	$amount = $form_state['values']['payflow_payments_amount'];
+	$exp_year = $form_state['values']['payflow_payments_expiration_year'];
+	$exp_month = $form_state['values']['payflow_payments_expiration_month'];
+	$zip_code = $form_state['values']['payflow_payments_zip'];
 	
 	if(strlen($name)<5) {
 		form_set_error('payflow_payments_name', t('Card holders name must me greater than 5 characters'));
@@ -267,6 +266,18 @@ function payflow_payments_form_validate($form, &$form_state) {
 	if(!is_numeric($amount)) {
 		form_set_error('payflow_payments_amount', t('Amount is not a valid number.'));
 	}
+	
+	$today = date('Y-m-d', strtotime(date('Y')."-".date('m')."-1"));
+	$ccDate = date('Y-m-d',strtotime($exp_year."-".$exp_month."-1"));
+	
+	if(strtotime($ccDate)< strtotime($today)) {
+		form_set_error('payflow_payments_expiration_month', t('Credit Card expiration is not valid.'));
+	}
+	
+	if(!preg_match("/^([0-9]{5})(-[0-9]{4})?$/i",$zip_code)){
+		form_set_error('payflow_payments_expiration_zip', t('Billing Zip Code is not valid.'));
+	}
+	
 	
 }
 
@@ -392,10 +403,15 @@ function payflow_payments_form_submit($form, &$form_state) {
 		$return[$kv[0]] = $kv[1];
 	}
 	
-	if($return['RESULT'] == 1 ) {
+	if($return['RESULT'] == 1) {
 		drupal_set_message(t($return['RESPMSG']), 'error');
 		return;
+	} 
+	else {
+		drupal_set_message(t($return['RESPMSG']), 'status');
 	}
+	
+	
 }
 
 function  payflow_payments_pro_server_url($txn_mode) {
