@@ -8,6 +8,7 @@
 
 define('PAYPAL_TXN_MODE_LIVE', 'live');
 define('PAYPAL_TXN_MODE_TEST', 'test');
+define('PAYPAL_FROM_EMAIL',"Payflow pro email <donotreply@".$GLOBALS['base_url'].">");
 
 function payflow_payments_help($path, $arg) {
 	switch ($path) {
@@ -102,9 +103,20 @@ function payflow_payments_menu() {
  */
 function payflow_payments_configuration_form($form, &$form_state) {
 	
+	$form['payflow_payments_email'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Notify Email Address'),
+			'#default_value' => variable_get('payflow_payments_email', ''),
+			'#size' => 30,
+			'#maxlength' => 50,
+			'#description' => t('Address used to notify a payment has been made.'),
+			'#required' => TRUE,
+	);
+	
+	
 	$form['payflow_payments_type'] = array(
 			'#type' => 'select',
-			'#title' => t('Live/Test'),
+			'#title' => t('Payflow Pro Enviroment Type Live/Test'),
 			'#options' => array(
 					PAYPAL_TXN_MODE_LIVE => t(PAYPAL_TXN_MODE_LIVE),
 					PAYPAL_TXN_MODE_TEST => t(PAYPAL_TXN_MODE_TEST),
@@ -129,7 +141,7 @@ function payflow_payments_configuration_form($form, &$form_state) {
 			'#default_value' => variable_get('payflow_payments_partner', 'partner'),
 			'#size' => 30,
 			'#maxlength' => 30,
-			'#description' => t('Vendor for Payflow Pro.'),
+			'#description' => t('Partner for Payflow Pro.'),
 			'#required' => TRUE,
 	);
 	
@@ -158,8 +170,14 @@ function payflow_payments_configuration_form($form, &$form_state) {
 
 function payflow_payments_configuration_form_validate($form, &$form_state) {
 	$password = $form_state['values']['payflow_payments_password'];
+	$email = $form_state['values']['payflow_payments_email'];
+	
 	if(strlen($password)>0 && strlen($password)<3) {
 		form_set_error('payflow_payments_password', t('Password must be greater than 3 characters.'));
+	}
+	
+	if(!valid_email_address($email)) {
+		form_set_error('payflow_payments_email', t('Notify Email Address must be valid.'));
 	}
 }
 
@@ -290,6 +308,7 @@ function payflow_payments_form_submit($form, &$form_state) {
 	$password = variable_get('payflow_payments_password', null);
 	$partner = variable_get('payflow_payments_partner', null);
 	$vendor = variable_get('payflow_payments_vendor', null);
+	$email_to = variable_get('payflow_payments_email', null);
 	
 	//Get form values
 	$name = $form_state['values']['payflow_payments_name'];
@@ -405,13 +424,19 @@ function payflow_payments_form_submit($form, &$form_state) {
 	
 	if($return['RESULT'] == 1) {
 		drupal_set_message(t($return['RESPMSG']), 'error');
+		$message = $name . " sent payment for invoice ".$invoice_num. " in the amount of "+$amount;
+		$from = PAYPAL_FROM_EMAIL;
+		$to = $email_to;
+		$mail_result = payflow_payments_email($from,$to, "Payflow Pro Payment Sent", $message);
+		if(!$mail_result) {
+			drupal_set_message(t('Email failed to send'), 'error');
+		}
 		return;
 	} 
 	else {
 		drupal_set_message(t($return['RESPMSG']), 'status');
+		
 	}
-	
-	
 }
 
 function  payflow_payments_pro_server_url($txn_mode) {
@@ -455,4 +480,35 @@ function  payflow_payments_luhn_check($number) {
 	// If the total mod 10 equals 0, the number is valid
 	return ($total % 10 == 0) ? TRUE : FALSE;
 
+}
+
+/**
+ * Send email notification of payflow transaction.
+ */
+function payflow_payments_email($from = 'default_from', $to, $subject, $message) {
+	$my_module = 'payflow_payments';
+	$my_mail_token = microtime();
+	if ($from == 'default_from') {
+		// Change this to your own default 'from' email address.
+		$from = variable_get('system_mail', 'Do Not Reply <example@example.com>');
+	}
+	$message = array(
+			'id' => $my_module . '_' . $my_mail_token,
+			'to' => $to,
+			'subject' => $subject,
+			'body' => array($message),
+			'headers' => array(
+					'From' => $from,
+					'Sender' => $from,
+					'Return-Path' => $from,
+			),
+	);
+	$system = drupal_mail_system($my_module, $my_mail_token);
+	$message = $system->format($message);
+	if ($system->mail($message)) {
+		return TRUE;
+	}
+	else {
+		return FALSE;
+	}
 }
